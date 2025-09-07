@@ -1,0 +1,30 @@
+---
+title: "Finance Data Collection"
+format: html
+editor: visual
+---
+
+```{r}
+library(yfR)
+```
+
+```{r}
+# P1: Stock price data
+tickers <- c("PFE", "AZN", "JNJ", "MRNA", "1099.HK", "SVA", "NVAX", "6185.HK", "CASBF", "302440.KS")
+first_date <- "2015-01-30"
+last_date <- Sys.Date() # 7 Sep 2025
+cache_folder <- "../data"
+
+df_yf <- yf_get(
+  tickers = tickers,
+  first_date = first_date,
+  last_date = last_date,
+  thresh_bad_data = 0,
+  freq_data = "daily",
+  do_complete_data = TRUE,
+  do_cache = TRUE,
+  cache_folder = cache_folder
+)
+
+print(df_yf)
+```
