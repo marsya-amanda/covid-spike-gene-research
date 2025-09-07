@@ -28,3 +28,8 @@ df_yf <- yf_get(
 
 print(df_yf)
 ```
+
+```{r}
+# P2: Currency conversion (forex) data
+
+```
