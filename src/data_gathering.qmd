@@ -5,6 +5,8 @@ editor: visual
 ---
 
 ```{r}
+library(dplyr)
+library(priceR)
 library(yfR)
 ```
 
@@ -31,5 +33,29 @@ print(df_yf)
 
 ```{r}
 # P2: Currency conversion (forex) data
+files <- paste0("../data/", list.files("../data"))
+from_currency <- c("HKD", "KRW", "HKD", "GBP")
 
+# loop through each file, onle 1-4 in non-USD
+for (i in 1:4) {
+  # read the data frame
+  df <- readRDS(files[i])
+  
+  # convert all columns except the first
+  df_usd <- df %>%
+    mutate(across(
+      .cols = -(1:2),
+      .fns = ~ convert_currencies(
+        price_start =.,
+        from = from_currency[i],
+        to = "USD",
+        date = .data[["ref_date"]])
+    ))
+  
+  # make new filename: e.g. USD_file1.rds
+  new_name <- paste0("USD_", files[i])
+  
+  # save the new data frame
+  saveRDS(df_usd, new_name)
+}
 ```
