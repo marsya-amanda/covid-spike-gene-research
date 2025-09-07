@@ -14,7 +14,7 @@ library(yfR)
 # P1: Stock price data
 tickers <- c("PFE", "AZN", "JNJ", "MRNA", "1099.HK", "SVA", "NVAX", "6185.HK", "CASBF", "302440.KS")
 first_date <- "2015-01-30"
-last_date <- Sys.Date() # 7 Sep 2025
+last_date <- "2025-09-08"
 cache_folder <- "../data"
 
 df_yf <- yf_get(
@@ -58,4 +58,23 @@ for (i in 1:4) {
   # save the new data frame
   saveRDS(df_usd, new_name)
 }
+```
+
+```{r}
+# P2: retrieve forex with yfR
+from_currency <- c("HKD", "KRW", "GBP")
+tickers_forex <- paste0(from_currency, "USD=X")
+
+df_forex <- yf_get(
+  tickers = tickers_forex,
+  first_date = first_date,
+  last_date = last_date,
+  thresh_bad_data = 0,
+  freq_data = "daily",
+  do_complete_data = TRUE,
+  do_cache = TRUE,
+  cache_folder = cache_folder
+)
+
+glimpse(df_forex)
 ```
