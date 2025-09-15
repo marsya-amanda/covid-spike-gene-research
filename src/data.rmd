@@ -1,0 +1,153 @@
+```{r}
+library(ggplot2)
+library(dplyr)
+```
+
+```{r}
+# Loading data
+HK_1099 <- readRDS("data/1099HK_yfR_2015-01-30_2025-09-08.rds") #HKD
+HK_6185 <- readRDS("data/6185HK_yfR_2015-01-30_2025-09-08.rds") #HKD
+KS_302440 <- readRDS("data/302440KS_yfR_2015-01-30_2025-09-08.rds") #KRW
+AZN <- readRDS("data/AZN_yfR_2015-01-30_2025-09-08.rds") #GBP
+CASBF <- readRDS("data/CASBF_yfR_2015-01-30_2025-09-08.rds") #USD
+GBPUSD <- readRDS("data/GBPUSD=X_yfR_2015-01-30_2025-09-08.rds") 
+GSPC <- readRDS("data/GSPC_yfR_2015-01-30_2025-09-08.rds") #USD <unused for now>
+HKDUSD <- readRDS("data/HKDUSD=X_yfR_2015-01-30_2025-09-08.rds")
+JNJ <- readRDS("data/JNJ_yfR_2015-01-30_2025-09-08.rds") #USD
+KRWUSD <- readRDS("data/KRWUSD=X_yfR_2015-01-30_2025-09-08.rds")
+MRNA <- readRDS("data/MRNA_yfR_2015-01-30_2025-09-08.rds") #USD
+NVAX <- readRDS("data/NVAX_yfR_2015-01-30_2025-09-08.rds") #USD
+PFE <- readRDS("data/PFE_yfR_2015-01-30_2025-09-08.rds") #USD
+SVA <- readRDS("data/SVA_yfR_2015-01-30_2025-09-08.rds") #USD
+```
+
+```{r}
+# use if u want to keep unconverted currencies
+# ticker_list <- list(HK_1099, HK_6185, KS_302440, AZN, CASBF, GBPUSD, GSPC, HKDUSD, JNJ, KRWUSD, MRNA, NVAX, PFE, SVA)
+# names(ticker_list) <- c("HK_1099", "HK_6185", "KS_302440", "AZN", "CASBF", "GBPUSD", "GSPC", "HKDUSD", "JNJ", "KRWUSD", "MRNA", "NVAX", "PFE", "SVA")
+```
+
+```{r}
+# Data cleaning and labeling
+ticker_list <- list(HK_1099, HK_6185, KS_302440, AZN, CASBF, JNJ, MRNA, NVAX, PFE, SVA)
+names(ticker_list) <- c("1099.HK", "6185.HK", "302440.KS", "AZN", "CASBF", "JNJ", "MRNA", "NVAX", "PFE", "SVA")
+
+# Checking for NULL values
+for(name in names(ticker_list)) {
+  df <- ticker_list[[name]]
+  print(sum(is.null(df)) == 0)
+}
+```
+
+
+```{r}
+# Converting to USD 
+## GBP -> USD
+AZN_USD <- AZN %>%
+  inner_join(GBPUSD %>% select(ref_date, price_close_forex = price_close), by = "ref_date") %>%
+  mutate(price_close = price_close * price_close_forex)
+## HKD -> USD
+HK_1099_USD <- HK_1099 %>%
+  inner_join(HKDUSD %>% select(ref_date, price_close_forex = price_close), by = "ref_date") %>%
+  mutate(price_close = price_close * price_close_forex)
+
+HK_6185_USD <- HK_6185 %>%
+  inner_join(HKDUSD %>% select(ref_date, price_close_forex = price_close), by = "ref_date") %>%
+  mutate(price_close = price_close * price_close_forex)
+
+KS_302440_USD <- KS_302440 %>%
+  inner_join(KRWUSD %>% select(ref_date, price_close_forex = price_close), by = "ref_date") %>%
+  mutate(price_close = price_close * price_close_forex)
+## Replacing unconverted data frames
+new_ticker_list <- list(HK_1099_USD, HK_6185_USD, KS_302440_USD, AZN_USD, CASBF, JNJ, MRNA, NVAX, PFE, SVA)
+names(new_ticker_list) <- c("1099.HK", "6185.HK", "302440.KS", "AZN", "CASBF", "JNJ", "MRNA", "NVAX", "PFE", "SVA")
+```
+
+```{r} 
+# Plots of all stocks
+par(mfrow=c(2,5))
+
+for(name in names(new_ticker_list)) {
+  df <- new_ticker_list[[name]]
+  plot(df$ref_date, df$price_close, 
+       type = "l", 
+       main = name, 
+       xlab = "Time", 
+       ylab = "Closing price (in USD)",
+       xlim = as.Date(c("2021-01-01", "2025-09-08"))
+       )
+}
+
+par(mfrow=c(1,1))
+```
+
+```{r}
+# 302440.KS in KRW
+plot(KS_302440$ref_date, KS_302440$price_close, 
+       type = "l", 
+       main = "302440.KS", 
+       xlab = "Time", 
+       ylab = "Closing price (in KRW)",
+       xlim = as.Date(c("2019-01-01", "2020-12-31"))
+  )
+```
+
+
+```{r}
+# PFE
+ggplot(PFE, aes(x = ref_date, y = price_close)) +
+  geom_line() +
+  scale_x_date(
+    date_breaks = "1 year",
+    date_minor_breaks = "1 month",
+    date_labels = "%b %Y",
+    limits = as.Date(c("2015-01-30", "2025-09-08"))
+  ) +
+  labs(
+    title = "PFE Closing Price Over Time",
+    x = "Year",
+    y = "Closing Price"
+  )
+```
+
+```{r}
+# AZN
+ggplot(AZN_USD, aes(x = ref_date, y = price_close)) +
+  geom_line() +
+  scale_x_date(
+    date_breaks = "1 year",
+    date_minor_breaks = "1 month",
+    date_labels = "%b %Y",
+    limits = as.Date(c("2015-01-30", "2025-09-08"))
+  ) +
+  labs(
+    title = "AZN Closing Price Over Time",
+    x = "Year",
+    y = "Closing Price"
+  )
+```
+
+```{r}
+# JNJ
+ggplot(JNJ, aes(x = ref_date, y = price_close)) +
+  geom_line() +
+  scale_x_date(
+    date_breaks = "1 year",
+    date_minor_breaks = "1 month",
+    date_labels = "%b %Y",
+    limits = as.Date(c("2015-01-30", "2025-09-08"))
+  ) +
+  labs(
+    title = "JNJ Closing Price Over Time",
+    x = "Year",
+    y = "Closing Price"
+  )
+```
+
+```{r}
+# Checking volumes
+ggplot(PFE, aes(x = volume)) +
+  geom_histogram() +
+  scale_x_date(date_breaks = "1 year", date_labels = "%Y")
+```
+
