@@ -46,6 +46,7 @@ for(name in names(ticker_list)) {
 AZN_USD <- AZN %>%
   inner_join(GBPUSD %>% select(ref_date, price_close_forex = price_close), by = "ref_date") %>%
   mutate(price_close = price_close * price_close_forex)
+saveRDS(AZN_USD, "../data/rds/AZN_USD_2015-01-30_2025-09-08.rds")
 ## HKD -> USD
 HK_1099_USD <- HK_1099 %>%
   inner_join(HKDUSD %>% select(ref_date, price_close_forex = price_close), by = "ref_date") %>%
