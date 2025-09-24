@@ -63,8 +63,8 @@ plot_events <- function(file_path, events) {
     theme(legend.position = "bottom")
 
   # Print plots
-  ggsave(paste0("../output/events_", ticker_name, ".png"))
-  ggsave(paste0("../output/zoomed_events_", ticker_name, ".png"))
+  ggsave(paste0("../output/events_", ticker_name, ".png"), plot = base)
+  ggsave(paste0("../output/zoomed_events_", ticker_name, ".png"), plot = zoomed)
   print(base)
   print(zoomed)
   
@@ -91,7 +91,7 @@ events_jnj <- c("2020-01-30",
                 "2020-06-10",
                 "2020-07-20",
                 "2021-02-27",
-                "2021-03-21",
+                "2021-03-12",
                 "2021-04-13",
                 "2021-04-21"
                 )
@@ -99,9 +99,10 @@ events_jnj <- c("2020-01-30",
 events_azn <- c("2020-01-30",
                 "2020-04-23",
                 "2020-08-31",
-                "2020-08-06",
+                "2020-09-06",
+                "2020-10-23",
                 "2020-12-30",
-                "2020-02-19",
+                "2021-02-19",
                 "2021-03-07",
                 "2021-03-16",
                 "2021-04-09",
@@ -121,9 +122,7 @@ plotted <- vector("list", length(file_paths))
 for (i in 1:3){
   plotted[[i]] = plot_events(file_paths[i], events[[i]])
 }
-plotted[[1]]$base_plot
-plotted[[2]]$base_plot
-plotted[[3]]$base_plot
+plotted[[3]]$base_plot / plotted[[2]]$base_plot
 
 plotted[[1]]$zoomed_plot
 plotted[[2]]$zoomed_plot
