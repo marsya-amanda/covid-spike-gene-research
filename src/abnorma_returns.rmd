@@ -1,0 +1,165 @@
+```{r}
+library(dplyr)
+
+market <- readRDS("../data/GSPC_yfR_2015-01-30_2025-09-08.rds")
+treasury10y_us <- readRDS("../data/TNX_yfR_2015-01-30_2025-09-08.rds")
+JNJ <- readRDS("../data/JNJ_yfR_2015-01-30_2025-09-08.rds")
+AZN <- readRDS("../data/rds/AZN_USD_2015-01-30_2025-09-08.rds")
+PFE <- readRDS("../data/PFE_yfR_2015-01-30_2025-09-08.rds")
+```
+
+
+
+```{r}
+car <- function(stock_data, market_data, rf_data, start_date, end_date, comparison=0, gap=0) {
+  t0 <- as.Date(start_date)
+  T1 <- as.Date(end_date)
+  
+  # stock returns
+  event_stock <- stock_data %>%
+    filter(ref_date >= t0 - 1, ref_date <= T1)
+  ret.stock <- event_stock$price_adjusted / lag(event_stock$price_adjusted) - 1
+  ret.stock <- ret.stock[-1]
+  
+  # market returns
+  event_market <- market_data %>%
+    filter(ref_date >= t0 - 1, ref_date <= T1)
+  ret.market <- event_market$price_adjusted / lag(event_market$price_adjusted) - 1
+  ret.market <- ret.market[-1]
+  
+  # risk free rate (in %)
+  event_rf <- rf_data %>%
+    filter(ref_date >= t0 - 1, ref_date <= T1)
+  rf <- event_rf$price_adjusted / lag(event_rf$price_adjusted) - 1
+  rf <- rf[-1]
+  
+  # market-adjusted abnormal returns
+  mam_abn_ret <- ret.stock - ret.market
+  
+  # comparison period mean adjusted modal
+  estim_start <- t0 - comparison - gap - 1
+  estim_end <- T1 - comparison - gap
+  estim <- stock_data %>%
+    filter(ref_date >= estim_start & ref_date <= estim_end)
+  ret.estim <- estim$price_adjusted / lag(estim$price_adjusted) - 1
+  ret.estim <- ret.estim[-1]
+  mean.estim <- mean(ret.estim)
+  
+  comp_abn_ret <- ret.stock - mean.estim
+  
+  # market model
+  beta <- cov(ret.market, ret.stock) / var(ret.market)
+  alpha <- ret.stock - rf - beta * (ret.market - rf)
+  
+  mm_abn_ret <- ret.stock - alpha - beta * ret.market
+
+  # summary
+  mam_car <- sum(mam_abn_ret)
+  comp_car <- sum(comp_abn_ret)
+  mm_car <- sum(mm_abn_ret)
+
+  return(list(
+    ret = list(
+      stock = ret.stock,
+      market = ret.market,
+      rf = rf,
+      alpha = alpha,
+      beta = beta
+    ),
+    
+    # Market Adjusted Model
+    MAM = list(
+      return = ret.stock,
+      abnormal_return = mam_abn_ret,
+      cumulative_abnormal_return = mam_car,
+      expected_return = ret.stock - mam_abn_ret
+    ),
+    
+    # Comparison Mean Adjusted Model
+    CMA = list(
+      return = ret.stock,
+      abnormal_return = comp_abn_ret,
+      cumulative_abnormal_return = comp_car,
+      expected_return = ret.stock - comp_abn_ret
+    ),
+    
+    # Market Model
+    MM = list(
+      return = ret.stock,
+      abnormal_return = mm_abn_ret,
+      cumulative_abnormal_return = mm_car,
+      expected_return = ret.stock - mm_abn_ret
+    )
+  ))
+}
+```
+
+
+```{r}
+start_date <- as.Date("2020-03-01") # data snooping
+end_date <- as.Date("2020-03-10")
+comparison <- 250
+gap <- 45
+
+# 1) cumulative abnormal returns
+car_JNJ <- car(JNJ, market, treasury10y_us, start_date, end_date, comparison, gap)
+car_AZN <- car(AZN, market, treasury10y_us, start_date, end_date, comparison, gap)
+car_PFE <- car(PFE, market, treasury10y_us, start_date, end_date, comparison, gap)
+
+# 2) get t-stat from computing for all stocks
+# a) get bar(CAR)
+ar.mam <- c(car_JNJ$MAM$abnormal_return, 
+            car_AZN$MAM$abnormal_return, 
+            car_PFE$MAM$abnormal_return)
+
+ar.cma <- c(car_JNJ$CMA$abnormal_return, 
+            car_AZN$CMA$abnormal_return, 
+            car_PFE$CMA$abnormal_return)
+
+ar.mm <- c(car_JNJ$MM$abnormal_return, 
+            car_AZN$MM$abnormal_return, 
+            car_PFE$MM$abnormal_return)
+
+car.mam <- c(car_JNJ$MAM$cumulative_abnormal_return, 
+            car_AZN$MAM$cumulative_abnormal_return, 
+            car_PFE$MAM$cumulative_abnormal_return)
+
+car.cma <- c(car_JNJ$CMA$cumulative_abnormal_return, 
+            car_AZN$CMA$cumulative_abnormal_return, 
+            car_PFE$CMA$cumulative_abnormal_return)
+
+car.mm <- c(car_JNJ$MM$cumulative_abnormal_return, 
+            car_AZN$MM$cumulative_abnormal_return, 
+            car_PFE$MM$cumulative_abnormal_return)
+
+# sample var of abnormal returns 
+#src: https://www.eventstudytools.com/significance-tests#A_1
+M = as.numeric(end_date - start_date + 1)
+L2 = as.numeric(end_date - start_date)
+s2.ar <- function(abnormal_return, M, K) {
+  # K for MM = 2, MAM = 1, CMA = 1 
+  return (sum(abnormal_return^2) / (M - K))
+}
+
+tsat.mam <- c()
+tstat.cma <- c()
+tstat.mm <- c()
+pval.mam <- c()
+pval.cma <- c()
+pval.mm <- c()
+
+for (i in 1:3) {
+  tstat.mam[i] <- car.mam[i] / sqrt(L2 * s2.ar(ar.mam[i], M, K = 1))
+  tstat.cma[i] <- car.cma[i] / sqrt(L2 * s2.ar(ar.cma[i], M, K = 1))
+  tstat.mm[i] <- car.mm[i] / sqrt(L2 * s2.ar(ar.mm[i], M, K = 2))
+  
+  pval.mam[i] <- pt(q = tstat.mam[i], df = 1)
+  pval.cma[i] <- pt(q = tstat.cma[i], df = 1)
+  pval.mm[i] <- pt(q = tstat.mm[i], df = 2)
+}
+
+result <- data.frame(row.names = c("JNJ", "AZN", "PFE"), MAM_t = tstat.mam, MAM_p = pval.mam, CMA_t = tstat.mam, CMA_p = pval.cma, MM_t = tstat.mm, MM_p = pval.mm)
+
+result
+```
+

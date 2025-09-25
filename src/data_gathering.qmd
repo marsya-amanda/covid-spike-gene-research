@@ -78,3 +78,17 @@ df_forex <- yf_get(
 
 glimpse(df_forex)
 ```
+
+```{r}
+# 10Y US Treasury Yield for Risk-free rates
+
+df_10y_treasury <- yf_get(
+  tickers = "^TNX",
+  first_date = first_date,
+  last_date = last_date,
+  thresh_bad_data = 0,
+  freq_data = "daily",
+  do_cache = TRUE,
+  cache_folder = cache_folder
+)
+```

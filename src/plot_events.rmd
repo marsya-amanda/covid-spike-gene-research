@@ -129,4 +129,8 @@ plotted[[2]]$zoomed_plot
 plotted[[3]]$zoomed_plot
 
 summary(plotted[[1]]$data)
+
+
+df <- readRDS(file_paths[1])
+ret <- df$price_close / lag(df$price_close) - 1
 ```
