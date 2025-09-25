@@ -141,6 +141,7 @@ s2.ar <- function(abnormal_return, M, K) {
   return (sum(abnormal_return^2) / (M - K))
 }
 
+# t test (assumed normality w/ CLT and indep. obs)
 tsat.mam <- c()
 tstat.cma <- c()
 tstat.mm <- c()
