@@ -1,0 +1,544 @@
+```{r}
+library(dplyr)
+
+market <- readRDS("../data/GSPC_yfR_2015-01-30_2025-09-08.rds")
+treasury10y_us <- readRDS("../data/TNX_yfR_2015-01-30_2025-09-08.rds")
+JNJ <- readRDS("../data/JNJ_yfR_2015-01-30_2025-09-08.rds")
+AZN <- readRDS("../data/rds/AZN_USD_2015-01-30_2025-09-08.rds")
+PFE <- readRDS("../data/PFE_yfR_2015-01-30_2025-09-08.rds")
+```
+
+
+
+```{r}
+car <- function(stock_data, market_data, rf_data, start_date, end_date, comparison=0, gap=0) {
+  t0 <- as.Date(start_date)
+  T1 <- as.Date(end_date)
+  
+  # Compute stock returns
+  event_stock <- stock_data %>%
+    filter(ref_date >= t0 - 1, ref_date <= T1) %>%
+    arrange(ref_date)
+  ret.stock <- event_stock$price_adjusted / lag(event_stock$price_adjusted) - 1
+  dates_stock <- event_stock$ref_date
+  ret.stock <- ret.stock[-1]
+  dates_stock <- dates_stock[-1]
+  
+  # Compute market returns
+  event_market <- market_data %>%
+    filter(ref_date >= t0 - 1, ref_date <= T1) %>%
+    arrange(ref_date)
+  ret.market <- event_market$price_adjusted / lag(event_market$price_adjusted) - 1
+  dates_market <- event_market$ref_date
+  ret.market <- ret.market[-1]
+  dates_market <- dates_market[-1]
+  
+  # Align by dates
+  common_dates <- intersect(dates_stock, dates_market)
+  ret.stock <- ret.stock[dates_stock %in% common_dates]
+  ret.market <- ret.market[dates_market %in% common_dates]
+  
+  # risk free rate (in %)
+  event_rf <- rf_data %>%
+    filter(ref_date >= t0 - 1, ref_date <= T1)
+  rf <- event_rf$price_adjusted / lag(event_rf$price_adjusted) - 1
+  rf <- rf[-1]
+  
+  # market-adjusted abnormal returns
+  mam_abn_ret <- ret.stock - ret.market
+  
+  # comparison period mean adjusted modal
+  estim_start <- t0 - comparison - gap - 1
+  estim_end <- T1 - comparison - gap
+  estim <- stock_data %>%
+    filter(ref_date >= estim_start & ref_date <= estim_end)
+  ret.estim <- estim$price_adjusted / lag(estim$price_adjusted) - 1
+  ret.estim <- ret.estim[-1]
+  mean.estim <- mean(ret.estim)
+  
+  comp_abn_ret <- ret.stock - mean.estim
+  
+  # market model
+  beta <- cov(ret.market, ret.stock) / var(ret.market)
+  alpha <- ret.stock - rf - beta * (ret.market - rf)
+  
+  mm_abn_ret <- ret.stock - alpha - beta * ret.market
+
+  # summary
+  mam_car <- sum(mam_abn_ret)
+  comp_car <- sum(comp_abn_ret)
+  mm_car <- sum(mm_abn_ret)
+
+  return(list(
+    ret = list(
+      stock = ret.stock,
+      market = ret.market,
+      rf = rf,
+      alpha = alpha,
+      beta = beta
+    ),
+    
+    # Market Adjusted Model
+    MAM = list(
+      return = ret.stock,
+      abnormal_return = mam_abn_ret,
+      cumulative_abnormal_return = mam_car,
+      expected_return = ret.stock - mam_abn_ret
+    ),
+    
+    # Comparison Mean Adjusted Model
+    CMA = list(
+      return = ret.stock,
+      abnormal_return = comp_abn_ret,
+      cumulative_abnormal_return = comp_car,
+      expected_return = ret.stock - comp_abn_ret
+    ),
+    
+    # Market Model
+    MM = list(
+      return = ret.stock,
+      abnormal_return = mm_abn_ret,
+      cumulative_abnormal_return = mm_car,
+      expected_return = ret.stock - mm_abn_ret
+    )
+  ))
+}
+```
+
+
+```{r}
+car.t.test <- function(stocks, market, rf, start_date, end_date, comparison, gap) {
+  # 1) compute CARs for each stock
+  car_results <- lapply(stocks, function(stock) {
+    car(stock, market, rf, start_date, end_date, comparison, gap)
+  })
+  names(car_results) <- names(stocks)
+  
+  # 2) flatten abnormal returns and CARs for each model
+  ar.mam <- unlist(lapply(car_results, function(x) x$MAM$abnormal_return))
+  ar.cma <- unlist(lapply(car_results, function(x) x$CMA$abnormal_return))
+  ar.mm  <- unlist(lapply(car_results, function(x) x$MM$abnormal_return))
+  
+  car.mam <- unlist(lapply(car_results, function(x) x$MAM$cumulative_abnormal_return))
+  car.cma <- unlist(lapply(car_results, function(x) x$CMA$cumulative_abnormal_return))
+  car.mm  <- unlist(lapply(car_results, function(x) x$MM$cumulative_abnormal_return))
+  
+  # 3) sample variance helper
+  s2.ar <- function(abnormal_return, M, K) {
+    sum(abnormal_return^2) / (M - K)
+  }
+  
+  M <- as.numeric(end_date - start_date + 1)
+  L2 <- as.numeric(end_date - start_date)
+  
+  # 4) run t-tests per stock
+  tstat.mam <- numeric(length(stocks))
+  tstat.cma <- numeric(length(stocks))
+  tstat.mm  <- numeric(length(stocks))
+  
+  pval.mam <- numeric(length(stocks))
+  pval.cma <- numeric(length(stocks))
+  pval.mm  <- numeric(length(stocks))
+  
+  for (i in seq_along(stocks)) {
+    tstat.mam[i] <- car.mam[i] / sqrt(L2 * s2.ar(ar.mam[i], M, K = 1))
+    tstat.cma[i] <- car.cma[i] / sqrt(L2 * s2.ar(ar.cma[i], M, K = 1))
+    tstat.mm[i]  <- car.mm[i]  / sqrt(L2 * s2.ar(ar.mm[i],  M, K = 2))
+    
+    pval.mam[i] <- pt(q = tstat.mam[i], df = 1)
+    pval.cma[i] <- pt(q = tstat.cma[i], df = 1)
+    pval.mm[i]  <- pt(q = tstat.mm[i],  df = 2)
+  }
+  
+  # 5) return results as a data.frame
+  result <- data.frame(
+    row.names = names(stocks),
+    MAM_t = tstat.mam, MAM_p = pval.mam,
+    CMA_t = tstat.cma, CMA_p = pval.cma,
+    MM_t = tstat.mm,   MM_p = pval.mm
+  )
+  
+  return(result)
+}
+```
+
+
+
+```{r}
+start_date <- as.Date("2020-01-20") # data snooping
+end_date <- as.Date("2020-02-10")
+comparison <- 250
+gap <- 45
+
+# 1) cumulative abnormal returns
+car_JNJ <- car(JNJ, market, treasury10y_us, start_date, end_date, comparison, gap)
+car_AZN <- car(AZN, market, treasury10y_us, start_date, end_date, comparison, gap)
+car_PFE <- car(PFE, market, treasury10y_us, start_date, end_date, comparison, gap)
+
+# 2) get t-stat from computing for all stocks
+# a) get bar(CAR)
+ar.mam <- c(car_JNJ$MAM$abnormal_return, 
+            car_AZN$MAM$abnormal_return, 
+            car_PFE$MAM$abnormal_return)
+
+ar.cma <- c(car_JNJ$CMA$abnormal_return, 
+            car_AZN$CMA$abnormal_return, 
+            car_PFE$CMA$abnormal_return)
+
+ar.mm <- c(car_JNJ$MM$abnormal_return, 
+            car_AZN$MM$abnormal_return, 
+            car_PFE$MM$abnormal_return)
+
+car.mam <- c(car_JNJ$MAM$cumulative_abnormal_return, 
+            car_AZN$MAM$cumulative_abnormal_return, 
+            car_PFE$MAM$cumulative_abnormal_return)
+
+car.cma <- c(car_JNJ$CMA$cumulative_abnormal_return, 
+            car_AZN$CMA$cumulative_abnormal_return, 
+            car_PFE$CMA$cumulative_abnormal_return)
+
+car.mm <- c(car_JNJ$MM$cumulative_abnormal_return, 
+            car_AZN$MM$cumulative_abnormal_return, 
+            car_PFE$MM$cumulative_abnormal_return)
+
+# sample var of abnormal returns 
+#src: https://www.eventstudytools.com/significance-tests#A_1
+M = as.numeric(end_date - start_date + 1)
+L2 = as.numeric(end_date - start_date)
+s2.ar <- function(abnormal_return, M, K) {
+  # K for MM = 2, MAM = 1, CMA = 1 
+  return (sum(abnormal_return^2) / (M - K))
+}
+
+# t test (assumed normality w/ CLT and indep. obs)
+tsat.mam <- c()
+tstat.cma <- c()
+tstat.mm <- c()
+pval.mam <- c()
+pval.cma <- c()
+pval.mm <- c()
+
+for (i in 1:3) {
+  tstat.mam[i] <- car.mam[i] / sqrt(L2 * s2.ar(ar.mam[i], M, K = 1))
+  tstat.cma[i] <- car.cma[i] / sqrt(L2 * s2.ar(ar.cma[i], M, K = 1))
+  tstat.mm[i] <- car.mm[i] / sqrt(L2 * s2.ar(ar.mm[i], M, K = 2))
+  
+  pval.mam[i] <- pt(q = tstat.mam[i], df = 1)
+  pval.cma[i] <- pt(q = tstat.cma[i], df = 1)
+  pval.mm[i] <- pt(q = tstat.mm[i], df = 2)
+}
+
+result <- data.frame(row.names = c("JNJ", "AZN", "PFE"), MAM_t = tstat.mam, MAM_p = pval.mam, CMA_t = tstat.mam, CMA_p = pval.cma, MM_t = tstat.mm, MM_p = pval.mm)
+
+result
+car.t.test(c(JNJ, AZN, PFE), market, treasury10y_us, start_date, end_date, comparison, gap)
+```
+```{r}
+# JNJ events
+# 2020-07-10: phase 1/2 start out / recruitment
+# 2021-02-31: US FDA emergency use
+# 2021-04-13: serious cases of blood clots
+
+comparison <- 250
+gap <- 45
+
+jnj_phase12 <- c(as.Date("2020-06-30"), as.Date("2020-07-20"))
+jnj_emergency <- c(as.Date("2021-02-21"), as.Date("2021-03-10"))
+jnj_clots <- c(as.Date("2021-04-03"), as.Date("2021-04-23"))
+
+# 1) cumulative abnormal returns
+car_jnj_p12 <- car(JNJ, market, treasury10y_us, jnj_phase12[1], jnj_phase12[2], comparison, gap)
+car_jnj_emergency <- car(AZN, market, treasury10y_us, jnj_emergency[1], jnj_emergency[2], comparison, gap)
+car_jnj_clots <- car(PFE, market, treasury10y_us, jnj_clots[1], jnj_clots[2], comparison, gap)
+
+# 2) get t-stat from computing for all stocks
+# a) get bar(CAR)
+ar.mam <- c(car_jnj_p12$MAM$abnormal_return, 
+            car_jnj_emergency$MAM$abnormal_return, 
+            car_jnj_clots$MAM$abnormal_return)
+
+ar.cma <- c(car_jnj_p12$CMA$abnormal_return, 
+            car_jnj_emergency$CMA$abnormal_return, 
+            car_jnj_clots$CMA$abnormal_return)
+
+ar.mm <- c(car_jnj_p12$MM$abnormal_return, 
+            car_jnj_emergency$MM$abnormal_return, 
+            car_jnj_clots$MM$abnormal_return)
+
+car.mam <- c(car_jnj_p12$MAM$cumulative_abnormal_return, 
+            car_jnj_emergency$MAM$cumulative_abnormal_return, 
+            car_jnj_clots$MAM$cumulative_abnormal_return)
+
+car.cma <- c(car_jnj_p12$CMA$cumulative_abnormal_return, 
+            car_jnj_emergency$CMA$cumulative_abnormal_return, 
+            car_jnj_clots$CMA$cumulative_abnormal_return)
+
+car.mm <- c(car_jnj_p12$MM$cumulative_abnormal_return, 
+            car_jnj_emergency$MM$cumulative_abnormal_return, 
+            car_jnj_clots$MM$cumulative_abnormal_return)
+
+# sample var of abnormal returns 
+#src: https://www.eventstudytools.com/significance-tests#A_1
+M = c(as.numeric(jnj_phase12[1] - jnj_phase12[2] + 1), 
+      as.numeric(jnj_emergency[1] - jnj_emergency[2] + 1), 
+      as.numeric(jnj_clots[1] - jnj_clots[2] + 1)
+      )
+L2 = c(as.numeric(jnj_phase12[1] - jnj_phase12[2]), 
+      as.numeric(jnj_emergency[1] - jnj_emergency[2]), 
+      as.numeric(jnj_clots[1] - jnj_clots[2])
+      )
+s2.ar <- function(abnormal_return, M, K) {
+  # K for MM = 2, MAM = 1, CMA = 1 
+  return (sum(abnormal_return^2) / (M - K))
+}
+
+# t test (assumed normality w/ CLT and indep. obs)
+tstat.mam <- c()
+tstat.cma <- c()
+tstat.mm <- c()
+pval.mam <- c()
+pval.cma <- c()
+pval.mm <- c()
+
+for (i in 1:3) {
+  tstat.mam[i] <- car.mam[i] / sqrt(L2[i] * s2.ar(ar.mam[i], M[i], K = 1))
+  tstat.cma[i] <- car.cma[i] / sqrt(L2[i] * s2.ar(ar.cma[i], M[i], K = 1))
+  tstat.mm[i] <- car.mm[i] / sqrt(L2[i] * s2.ar(ar.mm[i], M[i], K = 2))
+  
+  pval.mam[i] <- pt(q = tstat.mam[i], df = 1)
+  pval.cma[i] <- pt(q = tstat.cma[i], df = 1)
+  pval.mm[i] <- pt(q = tstat.mm[i], df = 2)
+}
+
+jnj_result <- data.frame(row.names = c(
+  "JNJ Phase 1/2 Start (2020-07-10)", 
+  "JNJ USFDA Emergency Use (2021-02-31)", 
+  "JNJ Emerge Cases of Blood Clots (2021-04-13)"
+  ), 
+  MAM_t = tstat.mam, 
+  MAM_p = pval.mam, 
+  CMA_t = tstat.mam, 
+  CMA_p = pval.cma, 
+  MM_t = tstat.mm, 
+  MM_p = pval.mm
+  )
+
+jnj_result
+```
+
+```{r}
+# AZN events
+# 2020-04-23: trials start worldwide, maybe 10 day event window?
+# 2020-09-06: US trials halt, bearish suspect
+# 2020-10-23: US trials resume, bullish
+# 2021-03-07: 1st case of blood clots
+# 2021-03-16: More cases of blood clots
+
+comparison <- 250
+gap <- 45
+
+azn_trials_start <- c(as.Date("2020-04-13"), as.Date("2020-05-03"))
+azn_us_halt <- c(as.Date("2020-08-27"), as.Date("2020-09-16")) 
+azn_us_resume <- c(as.Date("2020-10-13"), as.Date("2020-11-02"))
+azn_first_clots <- c(as.Date("2021-02-25"), as.Date("2021-03-17"))
+azn_more_clots <- c(as.Date("2021-03-06"), as.Date("2021-03-26"))
+
+# 1) cumulative abnormal returns
+car_azn_trials_start <- car(AZN, market, treasury10y_us, azn_trials_start[1], azn_trials_start[2], comparison, gap)
+car_azn_us_halt      <- car(AZN, market, treasury10y_us, azn_us_halt[1], azn_us_halt[2], comparison, gap)
+car_azn_us_resume    <- car(AZN, market, treasury10y_us, azn_us_resume[1], azn_us_resume[2], comparison, gap)
+car_azn_first_clot   <- car(AZN, market, treasury10y_us, azn_first_clots[1], azn_first_clots[2], comparison, gap)
+car_azn_more_clots   <- car(AZN, market, treasury10y_us, azn_more_clots[1], azn_more_clots[2], comparison, gap)
+
+# 2) get t-stat from computing for all stocks
+# a) get bar(CAR)
+ar.mam <- c(car_azn_trials_start$MAM$abnormal_return, 
+            car_azn_us_halt$MAM$abnormal_return, 
+            car_azn_us_resume$MAM$abnormal_return,
+            car_azn_first_clot$MAM$abnormal_return,
+            car_azn_more_clots$MAM$abnormal_return)
+
+ar.cma <- c(car_azn_trials_start$CMA$abnormal_return, 
+            car_azn_us_halt$CMA$abnormal_return, 
+            car_azn_us_resume$CMA$abnormal_return,
+            car_azn_first_clot$CMA$abnormal_return,
+            car_azn_more_clots$CMA$abnormal_return)
+
+ar.mm <- c(car_azn_trials_start$MM$abnormal_return, 
+           car_azn_us_halt$MM$abnormal_return, 
+           car_azn_us_resume$MM$abnormal_return,
+           car_azn_first_clot$MM$abnormal_return,
+           car_azn_more_clots$MM$abnormal_return)
+
+car.mam <- c(car_azn_trials_start$MAM$cumulative_abnormal_return, 
+             car_azn_us_halt$MAM$cumulative_abnormal_return, 
+             car_azn_us_resume$MAM$cumulative_abnormal_return,
+             car_azn_first_clot$MAM$cumulative_abnormal_return,
+             car_azn_more_clots$MAM$cumulative_abnormal_return)
+
+car.cma <- c(car_azn_trials_start$CMA$cumulative_abnormal_return, 
+             car_azn_us_halt$CMA$cumulative_abnormal_return, 
+             car_azn_us_resume$CMA$cumulative_abnormal_return,
+             car_azn_first_clot$CMA$cumulative_abnormal_return,
+             car_azn_more_clots$CMA$cumulative_abnormal_return)
+
+car.mm <- c(car_azn_trials_start$MM$cumulative_abnormal_return, 
+            car_azn_us_halt$MM$cumulative_abnormal_return, 
+            car_azn_us_resume$MM$cumulative_abnormal_return,
+            car_azn_first_clot$MM$cumulative_abnormal_return,
+            car_azn_more_clots$MM$cumulative_abnormal_return)
+
+# sample var of abnormal returns 
+#src: https://www.eventstudytools.com/significance-tests#A_1
+M <- c(as.numeric(azn_trials_start[2] - azn_trials_start[1] + 1), 
+       as.numeric(azn_us_halt[2] - azn_us_halt[1] + 1), 
+       as.numeric(azn_us_resume[2] - azn_us_resume[1] + 1), 
+       as.numeric(azn_first_clots[2] - azn_first_clots[1] + 1), 
+       as.numeric(azn_more_clots[2] - azn_more_clots[1] + 1)
+)
+
+L2 <- c(as.numeric(azn_trials_start[2] - azn_trials_start[1]), 
+        as.numeric(azn_us_halt[2] - azn_us_halt[1]), 
+        as.numeric(azn_us_resume[2] - azn_us_resume[1]), 
+        as.numeric(azn_first_clots[2] - azn_first_clots[1]), 
+        as.numeric(azn_more_clots[2] - azn_more_clots[1])
+)
+
+s2.ar <- function(abnormal_return, M, K) {
+  # K for MM = 2, MAM = 1, CMA = 1 
+  return(sum(abnormal_return^2) / (M - K))
+}
+
+# t test (assumed normality w/ CLT and indep. obs)
+tstat.mam <- c()
+tstat.cma <- c()
+tstat.mm <- c()
+pval.mam <- c()
+pval.cma <- c()
+pval.mm <- c()
+
+for (i in 1:5) {
+  tstat.mam[i] <- car.mam[i] / sqrt(L2[i] * s2.ar(ar.mam[i], M[i], K = 1))
+  tstat.cma[i] <- car.cma[i] / sqrt(L2[i] * s2.ar(ar.cma[i], M[i], K = 1))
+  tstat.mm[i] <- car.mm[i] / sqrt(L2[i] * s2.ar(ar.mm[i], M[i], K = 2))
+  
+  pval.mam[i] <- pt(q = tstat.mam[i], df = 1)
+  pval.cma[i] <- pt(q = tstat.cma[i], df = 1)
+  pval.mm[i] <- pt(q = tstat.mm[i], df = 2)
+}
+
+azn_result <- data.frame(
+  row.names = c(
+    "AZN Global Trials Start (2020-04-23)", 
+    "AZN US Trials Halt (2020-09-06)", 
+    "AZN US Trials Resume (2020-10-23)", 
+    "AZN First Report of Blood Clots (2021-03-07)", 
+    "AZN More Blood Clot Reports (2021-03-16)"
+  ),
+  MAM_t = tstat.mam,
+  MAM_p = pval.mam,
+  CMA_t = tstat.cma,
+  CMA_p = pval.cma,
+  MM_t  = tstat.mm,
+  MM_p  = pval.mm
+)
+
+azn_result
+```
+
+```{r}
+# PFE events
+# 2020-11: strong Phase 3 results + UK emergency use
+# 2021-08-23: first COVID-19 vaccine approved by FDA (bullish then bearish)
+# 2021-10-29: FDA emergency use for age 5-11 (bullish)
+
+comparison <- 250
+gap <- 45
+
+pfe_phase3_uk_eua <- c(as.Date("2020-10-22"), as.Date("2020-11-01"))
+pfe_fda_approval  <- c(as.Date("2021-08-13"), as.Date("2021-09-02"))
+pfe_fda_age5_11   <- c(as.Date("2021-10-19"), as.Date("2021-11-08"))
+
+# 1) cumulative abnormal returns
+car_pfe_phase3_uk_eua <- car(PFE, market, treasury10y_us, pfe_phase3_uk_eua[1], pfe_phase3_uk_eua[2], comparison, gap)
+car_pfe_fda_approval  <- car(PFE, market, treasury10y_us, pfe_fda_approval[1], pfe_fda_approval[2], comparison, gap)
+car_pfe_fda_age5_11   <- car(PFE, market, treasury10y_us, pfe_fda_age5_11[1], pfe_fda_age5_11[2], comparison, gap)
+
+# 2) get t-stat from computing for all stocks
+# a) get bar(CAR)
+ar.mam <- c(car_pfe_phase3_uk_eua$MAM$abnormal_return,
+            car_pfe_fda_approval$MAM$abnormal_return,
+            car_pfe_fda_age5_11$MAM$abnormal_return)
+
+ar.cma <- c(car_pfe_phase3_uk_eua$CMA$abnormal_return,
+            car_pfe_fda_approval$CMA$abnormal_return,
+            car_pfe_fda_age5_11$CMA$abnormal_return)
+
+ar.mm <- c(car_pfe_phase3_uk_eua$MM$abnormal_return,
+           car_pfe_fda_approval$MM$abnormal_return,
+           car_pfe_fda_age5_11$MM$abnormal_return)
+
+car.mam <- c(car_pfe_phase3_uk_eua$MAM$cumulative_abnormal_return,
+             car_pfe_fda_approval$MAM$cumulative_abnormal_return,
+             car_pfe_fda_age5_11$MAM$cumulative_abnormal_return)
+
+car.cma <- c(car_pfe_phase3_uk_eua$CMA$cumulative_abnormal_return,
+             car_pfe_fda_approval$CMA$cumulative_abnormal_return,
+             car_pfe_fda_age5_11$CMA$cumulative_abnormal_return)
+
+car.mm <- c(car_pfe_phase3_uk_eua$MM$cumulative_abnormal_return,
+            car_pfe_fda_approval$MM$cumulative_abnormal_return,
+            car_pfe_fda_age5_11$MM$cumulative_abnormal_return)
+
+# sample var of abnormal returns 
+#src: https://www.eventstudytools.com/significance-tests#A_1
+M <- c(as.numeric(pfe_phase3_uk_eua[2] - pfe_phase3_uk_eua[1] + 1),
+       as.numeric(pfe_fda_approval[2] - pfe_fda_approval[1] + 1),
+       as.numeric(pfe_fda_age5_11[2] - pfe_fda_age5_11[1] + 1)
+)
+
+L2 <- c(as.numeric(pfe_phase3_uk_eua[2] - pfe_phase3_uk_eua[1]),
+        as.numeric(pfe_fda_approval[2] - pfe_fda_approval[1]),
+        as.numeric(pfe_fda_age5_11[2] - pfe_fda_age5_11[1])
+)
+
+s2.ar <- function(abnormal_return, M, K) {
+  # K for MM = 2, MAM = 1, CMA = 1 
+  return(sum(abnormal_return^2) / (M - K))
+}
+
+# t test (assumed normality w/ CLT and indep. obs)
+tstat.mam <- c()
+tstat.cma <- c()
+tstat.mm <- c()
+pval.mam <- c()
+pval.cma <- c()
+pval.mm <- c()
+
+for (i in 1:3) {
+  tstat.mam[i] <- car.mam[i] / sqrt(L2[i] * s2.ar(ar.mam[i], M[i], K = 1))
+  tstat.cma[i] <- car.cma[i] / sqrt(L2[i] * s2.ar(ar.cma[i], M[i], K = 1))
+  tstat.mm[i] <- car.mm[i] / sqrt(L2[i] * s2.ar(ar.mm[i], M[i], K = 2))
+  
+  pval.mam[i] <- pt(q = tstat.mam[i], df = 1)
+  pval.cma[i] <- pt(q = tstat.cma[i], df = 1)
+  pval.mm[i] <- pt(q = tstat.mm[i], df = 2)
+}
+
+pfe_result <- data.frame(
+  row.names = c(
+    "PFE Phase 3 Results + UK EUA (2020-11)", 
+    "PFE First US FDA Approval (2021-08-23)", 
+    "PFE FDA EUA for Age 5-11 (2021-10-29)"
+  ),
+  MAM_t = tstat.mam,
+  MAM_p = pval.mam,
+  CMA_t = tstat.cma,
+  CMA_p = pval.cma,
+  MM_t  = tstat.mm,
+  MM_p  = pval.mm
+)
+
+
+pfe_result
+```
