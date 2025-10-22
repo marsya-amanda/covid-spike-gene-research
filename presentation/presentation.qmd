@@ -1,0 +1,426 @@
+---
+title: "Pricing the Pandemic"
+subtitle: "<span style='font-size: 1.2em; font-style: italic'>How COVID-19 Events Moved Markets</span>"
+author: 
+  - name: "Tuan Tran & Marsya Amanda  \nMentored by Dr. Beilei Bian"
+format:
+  revealjs:
+    theme: serif
+    title-slide-attributes:
+      data-align: "left"
+---
+
+# Motivation & Background
+
+## 
+
+::: {.callout-important appearance="simple"}
+### Motivation
+
+-   Investigate market perception of pharmaceutical innovation and public health news.
+
+-   Learn and apply event studies methods to study investor behaviour under uncertainty.
+:::
+
+::: {.callout-important appearance="simple"}
+### Background
+
+-   The widespread impact of COVID-19 events and vaccine innovation have been investigated in previous studies, but with less focus of the impact of these events on vaccine-producing companies themselves.
+
+-   We focus on the three largest COVID-19 vaccine-producing companies by market capitalisation: Oxford-AstraZeneca, Janssen-Cilag International NV (sub-company of Johnson & Johnson), and Pfizer-BioNTech.
+
+-   Pfizer-BioNTech was the COVID-19 vaccine to be approved by the United States Food and Drugs Association.
+:::
+
+# Methods
+
+## Data Collection
+
+-   **Tools:** `yfR` (Yahoo Finance) R package.
+
+-   **Time period:** January 30, 2015 to November 8, 2025
+
+-   **Stocks:** Pfizer-BioNTech `(PFE)`, Oxford-AstraZeneca `(AZN)`, Johnson & Johnson `(JNJ)`
+
+-   **Foreign exchange rates:** GBP to USD exchange rate `(GBPUSD)`
+
+-   **Market & risk-free rates:** S&P 500 `(GSPC)`, 10-year US treasury yields `(TNX)`
+
+```{r}
+#| message: false
+#| warning: false
+#| include: false
+#| paged-print: false
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(janitor)
+library(patchwork)
+
+# all results
+company_results <- readRDS("../output/company-specific-results.rds")
+
+# 3 largest in market cap
+file_paths <- c("../data/JNJ_yfR_2015-01-30_2025-09-08.rds",
+                "../data/rds/AZN_USD_2015-01-30_2025-09-08.rds", 
+                "../data/PFE_yfR_2015-01-30_2025-09-08.rds")
+azn <- readRDS(file_paths[2])
+jnj <- readRDS(file_paths[1])
+pfe <- readRDS(file_paths[3])
+
+# Function
+cumret <- function(file_path) {
+  # Read data
+  df <- readRDS(file_path)
+
+  price_close <- df$price_close
+  ret <- price_close / dplyr::lag(price_close) -1
+  cumret <- cumprod(1 + coalesce(ret, 0)) - 1
+
+  # Preprocess
+  df <- df %>%
+    group_by(ref_date) %>%
+    select(contains("ticker"), ref_date, price_close, volume, price_adjusted) %>%
+    mutate(
+      price_close = as.numeric(price_close),
+      price_adjusted = as.numeric(price_adjusted),
+      volume = as.numeric(volume)
+    ) %>%
+    arrange(ref_date) %>%
+    mutate(
+      ret = !!ret,
+      cumret = !!cumret)
+  
+  min_cumret <- min(df$cumret)
+  ticker_col <- names(df)[grepl("ticker", names(df))]
+  ticker_name <- df[[ticker_col[1]]][1]
+  
+  # Return useful objects
+  return(list(
+    data = df,
+    ret = ret,
+    cumret = cumret
+  ))
+}
+
+# combine data sets for stacked line chart
+jnj_mod <- as.data.frame(cumret(file_paths[1])[[1]])
+azn_mod <- as.data.frame(cumret(file_paths[2])[[1]])
+pfe_mod <- as.data.frame(cumret(file_paths[3])[[1]])
+
+combined_cumret <- bind_rows(jnj_mod, azn_mod, pfe_mod)
+```
+
+# Exploratory Data Analysis (EDA)
+
+## Data Structure
+
+For each of `PFE`, `AZN`, `JNJ`, `GBPUSD` , and `^TNX`:
+
+-   2666 observations of 7 variables: `ticker, ref_date, price_close, volume, price_adjusted, ret, cumret`
+
+-   No missing values after filtering
+
+-   `AZN` closing and adjusted price is converted to USD, with additional `ticker.x` and `ticker.y` columns.
+
+## 
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+#| paged-print: true
+
+knitr::kable(head(azn), format = "markdown", caption = "Oxford-AstraZeneca (converted to USD)", digits = 2) %>%
+  kableExtra::kable_classic() %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "bordered"),
+                full_width = T,
+                font_size = 13,
+                position = "left")
+
+knitr::kable(head(jnj), caption = "Johnson & Johnson", digits = 2)  %>%
+  kableExtra::kable_classic() %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "bordered"),
+                full_width = T,
+                font_size = 13,
+                position = "left")
+
+knitr::kable(head(jnj), caption = "Pfizer-BioNTech", digits = 2)  %>%
+  kableExtra::kable_classic() %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "bordered"),
+                full_width = T,
+                font_size = 13,
+                position = "left")
+```
+
+## Market-wide events
+
+::::: columns
+::: {.column style="width "}
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+#| fig-height: 6
+#| fig-width: 7.5
+#| paged-print: false
+
+# plot stacked line chart - general events
+gen_events <- c(as.Date("2020-01-30"),
+                as.Date("2020-12-31"),
+                as.Date("2023-05-05"))
+
+zoomed_combined <- combined_cumret %>%
+  filter(
+    ref_date >= min(gen_events) - 300, 
+    ref_date <= max(gen_events) + 300
+  )
+
+minc <- min(combined_cumret$cumret)
+
+p_ge <- ggplot(zoomed_combined, aes(x = ref_date, y = cumret, group = ticker, color = ticker)) +
+  geom_line() +
+  geom_vline(
+    xintercept = gen_events,
+    colour = "gray30",
+    linetype = "dashed"
+    ) +
+  annotate(
+    "label",
+    x = gen_events[1],
+    y = 0.55,
+    label = "PHEIC\nAnnounced",
+    angle = 0,
+    vjust = -0.5,
+    size = 3,
+    colour = "gray30"
+  ) +
+  annotate(
+    "label",
+    x = gen_events[2],
+    y = 0.7,
+    label = "First FDA\nApproval",
+    angle = 0,
+    vjust = -0.5,
+    size = 3,
+    colour = "gray30"
+  ) +
+  annotate(
+    "label",
+    x = gen_events[3],
+    y = 0.8,
+    label = "PHEIC\nRemoved",
+    angle = 0,
+    vjust = -0.5,
+    size = 3,
+    colour = "gray30"
+  ) +
+  labs(
+    title = "Cumulative Returns of JNJ, AZN, and PFE",
+    colour = "Ticker",
+    x = "Date",
+    y = "Cumulative returns since 2015-01-30"
+  ) +
+  theme_linedraw()
+p_ge
+
+```
+:::
+
+::: {.column style="width "}
+-   obs1
+
+-   obs2
+:::
+:::::
+
+## Company-wide events
+
+::::: columns
+::: column
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+#| fig-height: 6
+#| fig-width: 6
+#| paged-print: false
+combined_data <- bind_rows(
+  jnj_mod |> mutate(company = "JNJ"),
+  azn_mod |> mutate(company = "AZN"),
+  pfe_mod |> mutate(company = "PFE")
+)
+
+event_data <- tribble(
+  ~company, ~date, ~label,
+  "JNJ", as.Date("2020-07-10"), "Phase 1/2\nTrial Start",
+  "JNJ", as.Date("2021-02-27"), "FDA EUA",
+  "JNJ", as.Date("2021-04-13"), "Pause/Related Event",
+  "AZN", as.Date("2020-04-23"), "World Trials\nCommence",
+  "AZN", as.Date("2020-09-06"), "US Trials Halt",
+  "AZN", as.Date("2020-10-23"), "US Trials Resume",
+  "AZN", as.Date("2021-03-07"), "First Clots",
+  "AZN", as.Date("2021-03-16"), "More Clots",
+  "PFE", as.Date("2020-11-01"), "UK EUA",
+  "PFE", as.Date("2021-08-23"), "FDA Approval",
+  "PFE", as.Date("2021-10-29"), "FDA EUA\nAges 5–11"
+)
+
+min_event <- min(event_data$date)
+max_event <- max(event_data$date)
+
+# zoom window: 20 days before earliest event to 60 days after latest (you can adjust)
+zoomed_data <- combined_data %>%
+  filter(
+    ref_date >= min_event - 20,
+    ref_date <= max_event + 60
+  )
+
+# --- Faceted plot ---
+ggplot(zoomed_data, aes(x = ref_date, y = cumret)) +
+  geom_line() +
+  geom_vline(
+    data = event_data,
+    aes(xintercept = date),
+    colour = "gray30",
+    linetype = "dashed"
+  ) +
+  ggrepel::geom_label_repel(
+    data = event_data,
+    aes(x = date, y = Inf, label = label),
+    colour = "gray30",
+    fill = "white",
+    label.size = 0.2,
+    direction = "y",
+    size = 2.5,
+    force = 2
+  ) +
+  facet_wrap(~ company, scales = "free_y", ncol = 1) +
+  labs(
+    title = "Cumulative Returns Around Major COVID-19 Vaccine Events",
+    x = "Date",
+    y = "Cumulative Returns (since 2015-01-30)"
+  ) +
+  theme_minimal() +
+  theme(
+    strip.background = element_rect(fill = "gray90", color = NA),
+    strip.text = element_text(face = "bold"),
+    plot.title = element_text(face = "bold"),
+    axis.text.x = element_text(angle = 15, hjust = 1),
+    plot.background = element_rect(fill = NA)
+  )
+
+```
+:::
+
+::: column
+-   obs1
+
+-   obs2
+
+-   
+:::
+:::::
+
+# Conducting Event Studies
+
+## 
+
+::: {.callout-note appearance="minimal"}
+## Workflow
+
+1.  **Define Pre-Event Window, Event Window, and Post-Event Window**
+
+2.  **Compute Normal vs. Abnormal Returns**
+
+3.  **Statistical Models for Expected Return**
+
+    -   Market Model: $R_{i,t} = \alpha_i + \beta_i \cdot R_{m,t} + \epsilon_{i,t}$
+
+    -   Market Adjusted Model: $R_{i,t} = R_{m,t} + \epsilon_{i,t}$
+
+    -   Comparison Period Mean Adjusted Model: $R_{i,t} = \mu_i + \epsilon_{i,t}$
+
+    -   Fama-French 3 Factor Model: $R_i - R_f = \alpha + \beta_1 \cdot (R_m - R_f) + \beta_2 \cdot \text{SMB} +\beta_3 \cdot \text{HML} + \epsilon$
+
+4.  **Compute Cumulative Abnormal Returns over Event Window**
+
+5.  **Conduct t-Test for Significance**
+
+    $H_0: \text{Expected abnormal returns during the event window} = 0$
+:::
+
+## Which Model to Use?
+
+# Results
+
+## Market-Wide Events
+
+-   result1
+
+## Company-Wide Events
+
+-   The **start of the global trials of the Oxford-AstraZeneca vaccine** resulted in a significant abnormal reaction in the AZN stock price (*p* = 0.0006) under the market model.
+
+-   The **first** **emergency use authorisation (EUA) of the Johnson & Johnson vaccine** by the US FDA was a significant event causing abnormal stock prices (*p* = 0.0142) relative to the mean JNJ stock price in the last 250 days.
+
+-   **Pfizer-BioNTech becoming the first vaccine to be approved by the US FDA** was significant (*p* = 0.0002) under the market model.
+
+## Data
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+#| paged-print: false
+
+significant_results <- company_results %>%
+  select(ends_with("_p")) %>%
+  mutate(across(everything(), ~ ifelse(. < 0.05, ., NA_real_))) %>%
+  filter(if_any(everything(), ~ !is.na(.))) %>%
+  mutate(across(where(is.numeric), ~ round(., 4))) %>%
+  mutate(across(everything(), ~ ifelse(is.na(.), "", .)))
+
+p_results <- company_results %>%
+  select(ends_with("_p"))
+
+knitr::kable(p_results, digits = 4) %>%
+  kableExtra::kable_classic() %>%
+  kableExtra::kable_styling(
+    bootstrap_options = c("striped", "bordered"),
+    full_width = T,
+    font_size = 24
+  ) %>%
+  kableExtra::row_spec(
+    row = 1,
+    background = "lightblue"
+  ) %>%
+  kableExtra::column_spec(
+    column = 2,
+    bold = ifelse(p_results$MAM_p < 0.05, TRUE, FALSE)
+  ) %>%
+  kableExtra::column_spec(
+    column = 3,
+    bold = ifelse(p_results$CMA_p < 0.05, TRUE, FALSE)
+  ) %>%
+  kableExtra::column_spec(
+    column = 4,
+    bold = ifelse(p_results$MM_p < 0.05, TRUE, FALSE)
+  ) %>%
+  kableExtra::row_spec(
+    row = 7,
+    background = "lightblue"
+  ) %>%
+  kableExtra::row_spec(
+    row = 10,
+    background = "lightblue"
+  )
+```
+
+## Conclusions
+
+### Investor Behaviour
+
+### Methodology
+
+## References
