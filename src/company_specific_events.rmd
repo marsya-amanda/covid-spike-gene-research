@@ -239,7 +239,7 @@ for (i in 1:3) {
 result <- data.frame(row.names = c("JNJ", "AZN", "PFE"), MAM_t = tstat.mam, MAM_p = pval.mam, CMA_t = tstat.mam, CMA_p = pval.cma, MM_t = tstat.mm, MM_p = pval.mm)
 
 result
-car.t.test(c(JNJ, AZN, PFE), market, treasury10y_us, start_date, end_date, comparison, gap)
+# car.t.test(c(JNJ, AZN, PFE), market, treasury10y_us, start_date, end_date, comparison, gap)
 ```
 ```{r}
 # JNJ events
@@ -550,3 +550,9 @@ pfe_result <- data.frame(
 
 pfe_result
 ```
+
+```{r}
+all_result <- rbind(azn_result, jnj_result, pfe_result)
+saveRDS(all_result, "../output/company-specific-results.rds")
+```
+
