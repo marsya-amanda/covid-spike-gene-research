@@ -10,6 +10,8 @@ format:
       data-align: "left"
 ---
 
+
+
 # Motivation & Background
 
 ## 
@@ -29,7 +31,7 @@ format:
 
 -   We focus on the three largest COVID-19 vaccine-producing companies by market capitalisation: Oxford-AstraZeneca, Janssen-Cilag International NV (sub-company of Johnson & Johnson), and Pfizer-BioNTech.
 
--   Pfizer-BioNTech was the first COVID-19 vaccine to be approved by the United States Food and Drugs Association.
+-   Pfizer-BioNTech was the COVID-19 vaccine to be approved by the United States Food and Drugs Association.
 :::
 
 # Methods
@@ -45,6 +47,8 @@ format:
 -   **Foreign exchange rates:** GBP to USD exchange rate `(GBPUSD)`
 
 -   **Market & risk-free rates:** S&P 500 `(GSPC)`, 10-year US treasury yields `(TNX)`
+
+
 
 ```{r}
 #| message: false
@@ -111,13 +115,28 @@ pfe_mod <- as.data.frame(cumret(file_paths[3])[[1]])
 combined_cumret <- bind_rows(jnj_mod, azn_mod, pfe_mod)
 ```
 
+
+
 # Exploratory Data Analysis (EDA)
 
+## Data Structure
+
+For each of `PFE`, `AZN`, `JNJ`, `GBPUSD` , and `^TNX`:
+
+-   2666 observations of 7 variables: `ticker, ref_date, price_close, volume, price_adjusted, ret, cumret`
+
+-   No missing values after filtering
+
+-   `AZN` closing and adjusted price is converted to USD, with additional `ticker.x` and `ticker.y` columns.
+
+## 
+
+
+
 ```{r}
-#| eval: false
+#| echo: false
 #| message: false
 #| warning: false
-#| include: false
 #| paged-print: true
 
 knitr::kable(head(azn), format = "markdown", caption = "Oxford-AstraZeneca (converted to USD)", digits = 2) %>%
@@ -142,26 +161,14 @@ knitr::kable(head(jnj), caption = "Pfizer-BioNTech", digits = 2)  %>%
                 position = "left")
 ```
 
-## Data Description
 
--   We used time-series analysis on cumulative returns at time $i$ on each stock which was calculated from the **`price_adjusted`** column values.
-
-    $$
-    \text{cumulative return}_i = \frac{\text{adjusted price}_i - \text{adjusted price}_0}{\text{adjusted price}_i}
-    $$
-
-## 
-
--   **Events** were divided into two categories:
-
-    -   **Market-wide**: events which were announced by international or governmental health organisations.
-
-    -   **Firm-specific**: events which were announced or initiated by firms themselves.
 
 ## Market-wide events
 
 ::::: columns
 ::: {.column style="width "}
+
+
 ```{r}
 #| echo: false
 #| message: false
@@ -237,6 +244,8 @@ p_ge <- ggplot(zoomed_combined, aes(x = ref_date, y = cumret, group = ticker, co
 p_ge
 
 ```
+
+
 :::
 
 ::: {.column style="width "}
@@ -250,10 +259,12 @@ p_ge
 :::
 :::::
 
-## Firm-specific events
+## Company-wide events
 
 ::::: columns
 ::: column
+
+
 ```{r}
 #| echo: false
 #| message: false
@@ -325,6 +336,8 @@ ggplot(zoomed_data, aes(x = ref_date, y = cumret)) +
   )
 
 ```
+
+
 :::
 
 ::: column
@@ -342,9 +355,16 @@ ggplot(zoomed_data, aes(x = ref_date, y = cumret)) +
 
 # Conducting Event Studies
 
-## Selecting Statistical Models for Expected Return
+## 
 
--   **Market Model, Market Adjusted Model,** and **Comparison Period Mean Adjusted Model** are chosen primarily firm-specific events.
+::: {.callout-note appearance="minimal"}
+## Workflow
+
+1.  **Define Pre-Event Window, Event Window, and Post-Event Window**
+
+2.  **Compute Normal vs. Abnormal Returns**
+
+3.  **Select Statistical Models for Expected Return**
 
     -   Market Model: $R_{i,t} = \alpha_i + \beta_i \cdot R_{m,t} + \epsilon_{i,t}$
 
@@ -352,13 +372,22 @@ ggplot(zoomed_data, aes(x = ref_date, y = cumret)) +
 
     -   Comparison Period Mean Adjusted Model: $R_{i,t} = \mu_i + \epsilon_{i,t}$
 
-## 
+    -   Fama-French 3 Factor Model: $R_i - R_f = \alpha + \beta_1 \cdot (R_m - R_f) + \beta_2 \cdot \text{SMB} +\beta_3 \cdot \text{HML} + \epsilon$
+
+4.  **Compute Cumulative Abnormal Returns over Event Window**
+
+5.  **Conduct t-Test for Significance**
+
+    $H_0: \text{Expected abnormal returns during the event window} = 0$, $H1: \text{otherwise}$
+:::
+
+## Which Model to Use?
+
+-   **Market Model, Market Adjusted Model,** and **Comparison Period Mean Adjusted Model** for primarily firm-specific events.
 
 -   **Fama-French 3 Factor Model** for events which are expected to have substantial market-wide impacts.
 
-    $$
-    R_i - R_f = \alpha + \beta_1 \cdot (R_m - R_f) + \beta_2 \cdot \text{SMB} +\beta_3 \cdot \text{HML} + \epsilon
-    $$
+# Thank You!
 
 # Results
 
@@ -366,7 +395,37 @@ ggplot(zoomed_data, aes(x = ref_date, y = cumret)) +
 
 -   result1
 
-## Firm-Specific Events
+## Company-Wide Events
+
+-   **The start of the global trials of the Oxford-AstraZeneca vaccine** resulted in a significant abnormal reaction in the AZN stock price (*p* = 0.0006) under the market model.
+
+-   **The first emergency use authorisation (EUA) of the Johnson & Johnson vaccine** by the US FDA was a significant event causing abnormal stock prices (*p* = 0.0142) relative to the mean JNJ stock price in the last 250 days.
+
+-   **Pfizer-BioNTech becoming the first vaccine to be approved** by the US FDA was a significant event (*p* = 0.0002) under the market model.
+
+## Conclusions
+
+### Investor Behaviour
+
+-   **Innovation** seemed to be a common factor in decision-making of investment into individual pharmaceutical companies.
+
+## 
+
+### Methodology
+
+-   Abnormality is model-dependent and *p*-values are interpreted differently under different models.
+
+### Further Action
+
+-   Explore how other firm-specific events impact external firms.
+
+    -   ie. Pfizer-BioNTech Emergency Use Authorisation for 5-11 year olds by the US FDA seemed to cause a dip in all three stocks.
+
+## References
+
+## Data
+
+
 
 ```{r}
 #| echo: false
@@ -429,46 +488,3 @@ knitr::kable(p_results, digits = 4) %>%
   )
 ```
 
-## Conclusions
-
-### Investor Behaviour
-
--   **Innovation** seemed to be a common factor in decision-making of investment into individual pharmaceutical companies.
-
-## 
-
-### Methodology
-
--   Abnormality is model-dependent and *p*-values are interpreted differently under different models.
-
-### Further Action
-
--   Explore how other firm-specific events impact external firms.
-
-    -   ie. Pfizer-BioNTech Emergency Use Authorisation for 5-11 year olds by the US FDA seemed to cause a dip in all three stocks.
-
-# Thank You! Questions?
-
-## References
-
-## Workflow
-
-1.  **Define Pre-Event Window, Event Window, and Post-Event Window**
-
-2.  **Compute Normal vs. Abnormal Returns**
-
-3.  **Select Statistical Models for Expected Return**
-
-    -   Market Model: $R_{i,t} = \alpha_i + \beta_i \cdot R_{m,t} + \epsilon_{i,t}$
-
-    -   Market Adjusted Model: $R_{i,t} = R_{m,t} + \epsilon_{i,t}$
-
-    -   Comparison Period Mean Adjusted Model: $R_{i,t} = \mu_i + \epsilon_{i,t}$
-
-    -   Fama-French 3 Factor Model: $R_i - R_f = \alpha + \beta_1 \cdot (R_m - R_f) + \beta_2 \cdot \text{SMB} +\beta_3 \cdot \text{HML} + \epsilon$
-
-4.  **Compute Cumulative Abnormal Returns over Event Window**
-
-5.  **Conduct t-Test for Significance**
-
-    $H_0: \text{Expected abnormal returns during the event window} = 0$, $H1: \text{otherwise}$
