@@ -8,6 +8,8 @@ format:
     theme: serif
     title-slide-attributes:
       data-align: "left"
+  html:
+    embed-resources: true
 ---
 
 # Motivation & Background
@@ -344,7 +346,7 @@ ggplot(zoomed_data, aes(x = ref_date, y = cumret)) +
 
 ## Selecting Statistical Models for Expected Return
 
--   **Market Model, Market Adjusted Model,** and **Comparison Period Mean Adjusted Model** are chosen primarily firm-specific events.
+-   **Market Model, Market Adjusted Model,** and **Comparison Period Mean Adjusted Model** are chosen primarily for firm-specific events.
 
     -   Market Model: $R_{i,t} = \alpha_i + \beta_i \cdot R_{m,t} + \epsilon_{i,t}$
 
@@ -354,17 +356,49 @@ ggplot(zoomed_data, aes(x = ref_date, y = cumret)) +
 
 ## 
 
--   **Fama-French 3 Factor Model** for events which are expected to have substantial market-wide impacts.
+-   **Fama-French 3 Factor Model** for market-wide events.
 
     $$
     R_i - R_f = \alpha + \beta_1 \cdot (R_m - R_f) + \beta_2 \cdot \text{SMB} +\beta_3 \cdot \text{HML} + \epsilon
     $$
 
+    -   $R_i - R_f$: Actual return of stock
+
+    -   $\alpha$: (intercept) Expected excess return of stock
+
+    -   $R_m - R_f$: Market excess return
+
+    -   **SMB (small minus big)**: Size premium
+
+    -   **HML (high minus low)**: Value premium
+
+    -   $\beta_{1,2,3}$: Est. coefficients for market, size, and value factors
+
+    -   $\epsilon$: Abnormal returns
+
 # Results
 
 ## Market-Wide Events
 
--   result1
+```{r}
+fama <- readRDS("../output/fama_results.rds")
+
+knitr::kable(fama, digits = 4) %>%
+  kableExtra::kable_classic() %>%
+  kableExtra::kable_styling(
+    bootstrap_options = c("striped", "bordered"),
+    full_width = T,
+    font_size = 24 
+  ) %>%
+  kableExtra::row_spec(
+    row = 3,
+    background = "darkseagreen2"
+  ) %>%
+  kableExtra::column_spec(
+    column = 4,
+    bold = ifelse(fama$p_event < 0.05, TRUE, FALSE)
+  )
+```
 
 ## Firm-Specific Events
 
@@ -434,14 +468,13 @@ knitr::kable(p_results, digits = 4) %>%
 ### Investor Behaviour
 
 -   **Innovation** seemed to be a common factor in decision-making of investment into individual pharmaceutical companies.
-
-## 
+-   Companies' market capitalisation and book-to-value ratio determine sensitivity to events.
 
 ### Methodology
 
 -   Abnormality is model-dependent and *p*-values are interpreted differently under different models.
 
-### Further Action
+## Further Action
 
 -   Explore how other firm-specific events impact external firms.
 
@@ -451,24 +484,28 @@ knitr::kable(p_results, digits = 4) %>%
 
 ## References
 
-## Workflow
+Perlin M (2023). *yfR: Downloads and Organizes Financial Data from Yahoo Finance*. R package version 1.1.0, https://github.com/ropensci/yfR.
 
-1.  **Define Pre-Event Window, Event Window, and Post-Event Window**
+Wickham H (2016). *ggplot2: Elegant Graphics for Data Analysis*. Springer-Verlag New York. ISBN 978-3-319-24277-4, https://ggplot2.tidyverse.org.
 
-2.  **Compute Normal vs. Abnormal Returns**
+World Health Organization (2023). *Status of COVID-19 Vaccines within WHO EUL/PQ evaluation process*. Guidance Document, https://extranet.who.int/pqweb/key-resources/documents/status-covid-19-vaccines-within-who-eulpq-evaluation-process.
 
-3.  **Select Statistical Models for Expected Return**
+## 
 
-    -   Market Model: $R_{i,t} = \alpha_i + \beta_i \cdot R_{m,t} + \epsilon_{i,t}$
+Nguyen M (2025). *A Guide on Data Analysis*. Bookdown, https://bookdown.org/mike/data_analysis/
 
-    -   Market Adjusted Model: $R_{i,t} = R_{m,t} + \epsilon_{i,t}$
+Dal-Ré R (2023). *The winding 12-month journey of the AstraZeneca COVID-19 vaccine since its first administration to humans*. Therapie, 78(3), 293–302. https://doi.org/10.1016/j.therap.2022.07.003
 
-    -   Comparison Period Mean Adjusted Model: $R_{i,t} = \mu_i + \epsilon_{i,t}$
+Brice Y, Morgan L, Kirmani M, Kirmani M, & Udeh M C (2023). *COVID-19 Vaccine Evolution and Beyond.* Neuroscience insights, 18, 26331055231180543. https://doi.org/10.1177/26331055231180543
 
-    -   Fama-French 3 Factor Model: $R_i - R_f = \alpha + \beta_1 \cdot (R_m - R_f) + \beta_2 \cdot \text{SMB} +\beta_3 \cdot \text{HML} + \epsilon$
+## 
 
-4.  **Compute Cumulative Abnormal Returns over Event Window**
+Müller S (2023). *Choosing the Right Approach: A Comprehensive Guide to Estimating Expected Returns.* https://eventstudy.de/models/expected_return.html#economic-models
 
-5.  **Conduct t-Test for Significance**
+Wolf M, Schimmer M, Levchenko A, & Müller S (2014). *EventStudyTools (Research Apps)*, St.Gallen, http://www.eventstudytools.com.
 
-    $H_0: \text{Expected abnormal returns during the event window} = 0$, $H1: \text{otherwise}$
+Fama E F, French K R (2025). *Current Research Returns*. Data Library, https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html
+
+## 
+
+Martinez-Blasco M, Serrano V, Prior F & Cuadros J (2023). *Analysis of an event study using the Fama–French five-factor model: teaching approaches including spreadsheets and the R programming language*. Financ Innov 9, 76. https://doi.org/10.1186/s40854-023-00477-3
