@@ -1,0 +1,114 @@
+[
+  {
+    "objectID": "presentation.html#section",
+    "href": "presentation.html#section",
+    "title": "Pricing the Pandemic",
+    "section": "",
+    "text": "Motivation\n\n\n\nInvestigate market perception of pharmaceutical innovation and public health news.\nLearn and apply event studies methods to study investor behaviour under uncertainty.\n\n\n\n\n\n\n\n\n\n\nBackground\n\n\n\nThe widespread impact of COVID-19 events and vaccine innovation have been investigated in previous studies, but with less focus of the impact of these events on vaccine-producing companies themselves.\nWe focus on the three largest COVID-19 vaccine-producing companies by market capitalisation: Oxford-AstraZeneca, Janssen-Cilag International NV (sub-company of Johnson & Johnson), and Pfizer-BioNTech.\nPfizer-BioNTech was the first COVID-19 vaccine to be approved by the United States Food and Drugs Association."
+  },
+  {
+    "objectID": "presentation.html#data-collection",
+    "href": "presentation.html#data-collection",
+    "title": "Pricing the Pandemic",
+    "section": "Data Collection",
+    "text": "Data Collection\n\nTools: yfR (Yahoo Finance) R package.\nTime period: January 30, 2015 to November 8, 2025\nStocks: Pfizer-BioNTech (PFE), Oxford-AstraZeneca (AZN), Johnson & Johnson (JNJ)\nForeign exchange rates: GBP to USD exchange rate (GBPUSD)\nMarket & risk-free rates: S&P 500 (GSPC), 10-year US treasury yields (TNX)"
+  },
+  {
+    "objectID": "presentation.html#data-description",
+    "href": "presentation.html#data-description",
+    "title": "Pricing the Pandemic",
+    "section": "Data Description",
+    "text": "Data Description\n\nWe used time-series analysis on cumulative returns at time \\(i\\) on each stock which was calculated from the price_adjusted column values.\n\\[\n\\text{cumulative return}_i = \\frac{\\text{adjusted price}_i - \\text{adjusted price}_0}{\\text{adjusted price}_i}\n\\]"
+  },
+  {
+    "objectID": "presentation.html#section-1",
+    "href": "presentation.html#section-1",
+    "title": "Pricing the Pandemic",
+    "section": "",
+    "text": "Events were divided into two categories:\n\nMarket-wide: events which were announced by international or governmental health organisations.\nFirm-specific: events which were announced or initiated by firms themselves."
+  },
+  {
+    "objectID": "presentation.html#market-wide-events",
+    "href": "presentation.html#market-wide-events",
+    "title": "Pricing the Pandemic",
+    "section": "Market-wide events",
+    "text": "Market-wide events\n\n\n\n\n\n\n\n\n\n\n\n\nObservations\n\nLarge dip in the months following official WHO pandemic announcement (PHEIC).\nEffect of the first-ever FDA-approved COVID-19 vaccine is unclear.\nDip in all three stocks with removal of PHEIC status."
+  },
+  {
+    "objectID": "presentation.html#firm-specific-events",
+    "href": "presentation.html#firm-specific-events",
+    "title": "Pricing the Pandemic",
+    "section": "Firm-specific events",
+    "text": "Firm-specific events\n\n\n\n\n\n\n\n\n\n\n\n\nObservations\n\nPossibly more activity during clinical trials and emergency use events \n\nJNJ: Phase ½ trials\nAZN: US trials halt and result\nPFE: UK emergency use"
+  },
+  {
+    "objectID": "presentation.html#selecting-statistical-models-for-expected-return",
+    "href": "presentation.html#selecting-statistical-models-for-expected-return",
+    "title": "Pricing the Pandemic",
+    "section": "Selecting Statistical Models for Expected Return",
+    "text": "Selecting Statistical Models for Expected Return\n\nMarket Model, Market Adjusted Model, and Comparison Period Mean Adjusted Model are chosen primarily for firm-specific events.\n\nMarket Model: \\(R_{i,t} = \\alpha_i + \\beta_i \\cdot R_{m,t} + \\epsilon_{i,t}\\)\nMarket Adjusted Model: \\(R_{i,t} = R_{m,t} + \\epsilon_{i,t}\\)\nComparison Period Mean Adjusted Model: \\(R_{i,t} = \\mu_i + \\epsilon_{i,t}\\)"
+  },
+  {
+    "objectID": "presentation.html#section-2",
+    "href": "presentation.html#section-2",
+    "title": "Pricing the Pandemic",
+    "section": "",
+    "text": "Fama-French 3 Factor Model for market-wide events.\n\\[\nR_i - R_f = \\alpha + \\beta_1 \\cdot (R_m - R_f) + \\beta_2 \\cdot \\text{SMB} +\\beta_3 \\cdot \\text{HML} + \\epsilon\n\\]\n\n\\(R_i - R_f\\): Actual return of stock\n\\(\\alpha\\): (intercept) Expected excess return of stock\n\\(R_m - R_f\\): Market excess return\nSMB (small minus big): Size premium\nHML (high minus low): Value premium\n\\(\\beta_{1,2,3}\\): Est. coefficients for market, size, and value factors\n\\(\\epsilon\\): Abnormal returns"
+  },
+  {
+    "objectID": "presentation.html#market-wide-events-1",
+    "href": "presentation.html#market-wide-events-1",
+    "title": "Pricing the Pandemic",
+    "section": "Market-Wide Events",
+    "text": "Market-Wide Events\n\n\n\n\n\nTicker\nEvent\nDate\np_event\np_post\n\n\n\n\nAZN\nPHEIC announcement\n2020-01-30\n0.5064\n0.1441\n\n\nJNJ\nPHEIC announcement\n2020-01-30\n0.9344\n0.3763\n\n\nPFE\nPHEIC announcement\n2020-01-30\n0.0050\n0.5665\n\n\nAZN\nPFE first vaccine approval\n2020-12-31\n0.5004\n0.2477\n\n\nJNJ\nPFE first vaccine approval\n2020-12-31\n0.4234\n0.9214\n\n\nPFE\nPFE first vaccine approval\n2020-12-31\n0.7154\n0.5321\n\n\nAZN\nPHEIC removal\n2023-05-05\n0.3141\n0.3658\n\n\nJNJ\nPHEIC removal\n2023-05-05\n0.5492\n0.3854\n\n\nPFE\nPHEIC removal\n2023-05-05\n0.7366\n0.6446"
+  },
+  {
+    "objectID": "presentation.html#firm-specific-events-1",
+    "href": "presentation.html#firm-specific-events-1",
+    "title": "Pricing the Pandemic",
+    "section": "Firm-Specific Events",
+    "text": "Firm-Specific Events\n\n\n\n\n\n\nMAM_p\nCMA_p\nMM_p\n\n\n\n\nAZN Global Trials Start (2020-04-23)\n0.9900\n0.9258\n0.0006\n\n\nAZN US Trials Halt (2020-09-06)\n0.2776\n0.0608\n0.5435\n\n\nAZN US Trials Resume (2020-10-23)\n0.2365\n0.0915\n0.8716\n\n\nAZN First Report of Blood Clots (2021-03-07)\n0.5448\n0.7290\n0.9193\n\n\nAZN More Blood Clot Reports (2021-03-16)\n0.7313\n0.9640\n0.3247\n\n\nJNJ Phase 1/2 Start (2020-07-10)\n0.8810\n0.9453\n0.2948\n\n\nJNJ USFDA Emergency Use (2021-02-27)\n0.5680\n0.0142\n0.9536\n\n\nJNJ Emerge Cases of Blood Clots (2021-04-13)\n0.9973\n0.9657\n0.3693\n\n\nPFE Phase 3 Results + UK EUA (2020-11)\n0.8083\n0.0519\n0.1490\n\n\nPFE First US FDA Approval (2021-08-23)\n0.1980\n0.0980\n0.0002\n\n\nPFE FDA EUA for Age 5-11 (2021-10-29)\n0.9702\n0.9856\n0.9546"
+  },
+  {
+    "objectID": "presentation.html#conclusions",
+    "href": "presentation.html#conclusions",
+    "title": "Pricing the Pandemic",
+    "section": "Conclusions",
+    "text": "Conclusions\nInvestor Behaviour\n\nInnovation seemed to be a common factor in decision-making of investment into individual pharmaceutical companies.\nCompanies’ market capitalisation and book-to-value ratio determine sensitivity to events.\n\nMethodology\n\nAbnormality is model-dependent and p-values are interpreted differently under different models."
+  },
+  {
+    "objectID": "presentation.html#further-action",
+    "href": "presentation.html#further-action",
+    "title": "Pricing the Pandemic",
+    "section": "Further Action",
+    "text": "Further Action\n\nExplore how other firm-specific events impact external firms.\n\nie. Pfizer-BioNTech Emergency Use Authorisation for 5-11 year olds by the US FDA seemed to cause a dip in all three stocks."
+  },
+  {
+    "objectID": "presentation.html#references",
+    "href": "presentation.html#references",
+    "title": "Pricing the Pandemic",
+    "section": "References",
+    "text": "References\nPerlin M (2023). yfR: Downloads and Organizes Financial Data from Yahoo Finance. R package version 1.1.0, https://github.com/ropensci/yfR.\nWickham H (2016). ggplot2: Elegant Graphics for Data Analysis. Springer-Verlag New York. ISBN 978-3-319-24277-4, https://ggplot2.tidyverse.org.\nWorld Health Organization (2023). Status of COVID-19 Vaccines within WHO EUL/PQ evaluation process. Guidance Document, https://extranet.who.int/pqweb/key-resources/documents/status-covid-19-vaccines-within-who-eulpq-evaluation-process."
+  },
+  {
+    "objectID": "presentation.html#section-3",
+    "href": "presentation.html#section-3",
+    "title": "Pricing the Pandemic",
+    "section": "",
+    "text": "Nguyen M (2025). A Guide on Data Analysis. Bookdown, https://bookdown.org/mike/data_analysis/\nDal-Ré R (2023). The winding 12-month journey of the AstraZeneca COVID-19 vaccine since its first administration to humans. Therapie, 78(3), 293–302. https://doi.org/10.1016/j.therap.2022.07.003\nBrice Y, Morgan L, Kirmani M, Kirmani M, & Udeh M C (2023). COVID-19 Vaccine Evolution and Beyond. Neuroscience insights, 18, 26331055231180543. https://doi.org/10.1177/26331055231180543"
+  },
+  {
+    "objectID": "presentation.html#section-4",
+    "href": "presentation.html#section-4",
+    "title": "Pricing the Pandemic",
+    "section": "",
+    "text": "Müller S (2023). Choosing the Right Approach: A Comprehensive Guide to Estimating Expected Returns. https://eventstudy.de/models/expected_return.html#economic-models\nWolf M, Schimmer M, Levchenko A, & Müller S (2014). EventStudyTools (Research Apps), St.Gallen, http://www.eventstudytools.com.\nFama E F, French K R (2025). Current Research Returns. Data Library, https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html"
+  },
+  {
+    "objectID": "presentation.html#section-5",
+    "href": "presentation.html#section-5",
+    "title": "Pricing the Pandemic",
+    "section": "",
+    "text": "Martinez-Blasco M, Serrano V, Prior F & Cuadros J (2023). Analysis of an event study using the Fama–French five-factor model: teaching approaches including spreadsheets and the R programming language. Financ Innov 9, 76. https://doi.org/10.1186/s40854-023-00477-3"
+  }
+]

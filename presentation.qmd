@@ -8,7 +8,6 @@ format:
     theme: serif
     title-slide-attributes:
       data-align: "left"
-  html:
     embed-resources: true
 ---
 
@@ -60,12 +59,12 @@ library(janitor)
 library(patchwork)
 
 # all results
-company_results <- readRDS("../output/company-specific-results.rds")
+company_results <- readRDS("output/company-specific-results.rds")
 
 # 3 largest in market cap
-file_paths <- c("../data/JNJ_yfR_2015-01-30_2025-09-08.rds",
-                "../data/rds/AZN_USD_2015-01-30_2025-09-08.rds", 
-                "../data/PFE_yfR_2015-01-30_2025-09-08.rds")
+file_paths <- c("data/JNJ_yfR_2015-01-30_2025-09-08.rds",
+                "data/rds/AZN_USD_2015-01-30_2025-09-08.rds", 
+                "data/PFE_yfR_2015-01-30_2025-09-08.rds")
 azn <- readRDS(file_paths[2])
 jnj <- readRDS(file_paths[1])
 pfe <- readRDS(file_paths[3])
@@ -381,7 +380,7 @@ ggplot(zoomed_data, aes(x = ref_date, y = cumret)) +
 ## Market-Wide Events
 
 ```{r}
-fama <- readRDS("../output/fama_results.rds")
+fama <- readRDS("output/fama_results.rds")
 
 knitr::kable(fama, digits = 4) %>%
   kableExtra::kable_classic() %>%
